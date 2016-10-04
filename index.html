@@ -14,20 +14,44 @@
     <![endif]-->
 </head>
 
-<body>
-    <div class="container">
-        <div class="control-group">
+<body id="remind-me">
+    <div class="wrapper">
+        <div class="control-group" data-bind="visible: !alarm()">
             <h1>Remind me</h1>
-            <div id="times">
+            <h3>
+                <select id="delay-time">
+                    <option value="15">15</option>
+                    <option value="30" selected="selected">30</option>
+                </select>
+                minutes before
+            </h3>
+            <!-- <h3>
+                from now until
+                <select id="end-time">
+                    <option value="15">15</option>
+                    <option value="30" selected="selected">30</option>
+                </select>
+            </h3> -->
+            <div id="times" data-bind="foreach: times().list">
+                <label class="control control--checkbox">
+                    <span data-bind="text: time"></span>
+                    <input type="checkbox" data-bind="value: time, checked: checked, event: {change: $parent.changeTimer($data)}">
+                    <div class="control__indicator"></div>
+                </label>
             </div>
 
         </div>
+
     </div>
-    <div id="alarm" style="display:none">
-        <h1>ALARM</h1>
-        <button>close alarm</button
+    <div id="alarm" data-bind="visible: alarm">
+        <div class="container">
+            <h1>Alarm</h1>
+            <h2 data-bind="text: alarmText"></h2>
+            <button data-bind="click: stopAlarm">close</button>
+        </div>
     </div>
     <script src="node_modules/jquery/dist/jquery.min.js"></script>
+    <script src="node_modules/knockout/build/output/knockout-latest.js"></script>
     <script src="node_modules/moment/min/moment.min.js"></script>
     <script src="script.js"></script>
 </body>

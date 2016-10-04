@@ -1,109 +1,170 @@
 $(document).ready(function() {
-    var interval = 30;
-    var delay = 30;
-    var timesList = createTimes();
-    var timers = {};
+    init();
 
-    updateTimes(times);
-
-    function createTimes() {
-        var curr = moment();
-        var start = moment("8:00am", "hh:mm a");
-        var end = moment("10:00pm", "hh:mm a");
-        var timesList = [];
-        if (curr.isBefore(start)) {
-            curr = start;
-        } else {
-            curr = calcStart();
+    function init() {
+        var delay = localStorage.getItem('delay') || 30;
+        var times = {
+            start: ko.observable(moment("8:00am", "hh:mm a")),
+            end: ko.observable(moment("10:01pm", "hh:mm a")),
+            list: ko.observable(localStorage.getItem('timesList'))
         }
-
-        console.log(curr._d);
-
-        while (curr.isSameOrBefore(end)) {
-            timesList.push({
-                time: curr.format("hh:mm a"),
-                checked: false
-            });
-            curr.add(interval, 'minutes');
-        }
-
-        return timesList;
+        var alarmInterval = 30;
+        var viewModel = new RemindVM(delay, times, new AlarmControl(alarmInterval));
+        ko.applyBindings(viewModel, $('#remind-me')[0]);
     }
 
-    function calcStart() {
-        var now = moment();
-        now.seconds(60);
-        var minutes = now.minutes();
-        var newMinutes = (Math.ceil((now.minutes() + 1) / interval) + 1) * interval;
-        newMinutes += newMinutes - minutes < delay ? interval : 0;
-        now.minutes(newMinutes);
-        return now;
-    }
+    function AlarmControl(interval) {
+        var self = this;
+        self.timers = {};
+        var alarmInterval = interval;
+        var alarmSound;
+        var audioContext = new AudioContext();
+        self.startTimer = function(ringTime, alarmTime, cb) {
+            console.log('starting');
+            console.log(ringTime);
+            console.log(alarmTime);
+            var hour = parseInt(ringTime.format('H'));
+            var minute = parseInt(ringTime.format('mm'));
 
-    function updateTimes() {
-        var times = []
-        var start = calcStart();
-        $.each(timesList, function(index, obj) {
-            if (moment(obj.time, 'hh:mm a').isAfter(start)) {
-                times.push(obj);
-            }
-        })
-        timesList = times;
-        $('#times').html('');
-        $.each(times, function(index, obj) {
-            var time = obj.time;
-            var element = $('<label>');
-            var input = $('<input>');
-            var controlIndicator = $('<div>');
-            element.addClass('control control--checkbox');
-            element.text(time);
-            input.attr('type', 'checkbox');
-            input.attr('value', time);
-            input.prop('checked', obj.checked);
-
-            input.change(checkboxCallback);
-
-            controlIndicator.addClass('control__indicator');
-            element.append(input, controlIndicator);
-            $('#times').append(element);
-        })
-    }
-
-    function checkboxCallback() {
-        var time = $(this).attr('value');
-        if ($(this).is(':checked')) {
-            var ringTime = moment(time, 'hh:mm a').subtract(delay, 'minutes');
-            var hour = ringTime.format('H');
-            var minute = ringTime.format('mm');
-            hour = 1;
-            minute = 57;
-            console.log(hour, minute);
             function alarmTimer() {
                 var now = moment();
                 var currentHour = parseInt(now.format('H'));
                 var currentMinute = parseInt(now.format('mm'));
                 console.log(currentHour, currentMinute);
                 if ((hour === currentHour) && (minute === currentMinute)) {
-                    $('#alarm').data('time', time);
-                    $('#alarm').show();
+                    startAlarm(alarmTime);
+                    cb();
                 }
             }
-            timers[time] = setInterval(alarmTimer, 1000);
-            timers[time];
-        } else {
-            clearInterval(timers[time]);
-            delete timers[time];
+            self.timers[alarmTime] = setInterval(alarmTimer, 1000);
+            console.log(self.timers);
+        }
+
+        self.stopTimer = function(time) {
+            console.log('stopping');
+            clearInterval(self.timers[time]);
+            delete self.timers[time];
+        }
+
+        self.setAlarmInterval = function(interval) {
+            alarmInterval = interval;
+            // TODO: update timers
+        }
+
+        self.stopAlarm = function() {
+            clearInterval(alarmInterval);
+        }
+
+        function startAlarm(time) {
+            console.log(time);
+            console.log(self.timers);
+            clearInterval(self.timers[time]);
+            delete self.timers[time];
+            alarmInterval = setInterval(playAlarmNote, 500);
+            var timeElement = $('#times input:checkbox').filter(function() {
+                return this.value === time;
+            });
+        }
+
+        function playAlarmNote() {
+            alarmSound = audioContext.createOscillator();
+            var volume = audioContext.createGain();
+
+            volume.gain.value = 0.1;
+            alarmSound.connect(volume);
+            volume.connect(audioContext.destination);
+
+            // How long to play oscillator for (in seconds)
+            var duration = .1;
+
+            // When to start playing the oscillators
+            var startTime = audioContext.currentTime;
+
+            var frequency = 493.883;
+            alarmSound.frequency.value = frequency;
+
+            volume.gain.setValueAtTime(0.1, startTime + duration - 0.01);
+            volume.gain.linearRampToValueAtTime(0, startTime + duration);
+
+            alarmSound.start(startTime);
+            alarmSound.stop(startTime + duration);
         }
     }
 
-    $('#alarm button').click(function() {
-        var time = moment($('#alarm').data('time'), "hh:mm a");
-        var timeFormatted = time.format("hh:mm a");
+    function RemindVM(delay, times, alarmControl) {
+        var self = this;
+        self.alarm = ko.observable(false);
 
-        updateTimes();
-        clearInterval(timers[timeFormatted]);
-        delete timers[timeFormatted];
+        self.interval = ko.observable(30);
+        self.delay = ko.observable(delay);
+        self.times = ko.observable(times);
+        self.times.initialize = updateTimes;
+        self.times().start.subscribe(updateTimes);
+        self.times().end.subscribe(updateTimes);
+        self.alarmText = ko.observable();
 
-        $('#alarm').hide();
-    })
-})
+        var Time = function(time, checked) {
+            this.time = time;
+            this.checked = checked;
+        }
+
+        self.times.initialize();
+
+        self.changeTimer = function(data) {
+            if (data.checked) {
+                var ringTime = moment(data.time, 'hh:mm a').subtract(self.delay(), 'minutes');
+                ringTime = moment(); //TODO: take this out
+
+                alarmControl.startTimer(ringTime, data.time, function() {
+                    console.log('starting alarm callback');
+
+                    self.alarmText(moment(data.time, 'hh:mm a').format('h:mm a'));
+                    self.alarm(true);
+                });
+            } else {
+                alarmControl.stopTimer(data.time);
+            }
+        }
+
+        self.stopAlarm = function() {
+            console.log('stopping alarm');
+            alarmControl.stopAlarm();
+            self.alarmText('');
+            self.alarm(false);
+        }
+
+        function updateTimes() {
+            var curr = moment();
+            var start = self.times().start();
+            var end = self.times().end();
+            if (curr.isBefore(start)) {
+                curr = start;
+            } else {
+                curr = calcStart();
+            }
+
+            var times = [];
+
+            while (!curr.isAfter(end)) {
+                times.push(new Time(curr.format("hh:mm a"), false));
+                curr.add(self.interval(), 'minutes');
+            }
+
+            self.times().list(times);
+            console.log(self.times().list());
+        }
+
+        function calcStart() {
+            var now = moment();
+            now.seconds(60);
+            var minutes = now.minutes();
+            var newMinutes = (Math.ceil((now.minutes() + 1) / self.interval()) + 1) * self.interval();
+            newMinutes += newMinutes - minutes < self.delay() ? self.interval() : 0;
+            now.minutes(newMinutes);
+            return now;
+        }
+
+    }
+
+
+});
