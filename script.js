@@ -87,7 +87,7 @@ $(document).ready(function() {
 
         function createTimes() {
             var curr = moment();
-            curr = moment().hours(1); // TODO: take this out
+            // curr = moment().hours(1); // TODO: take this out
             var start = self.timesStart();
             var end = self.timesEnd();
             if (curr.isBefore(start)) {
