@@ -57,10 +57,6 @@ h1 {
 .control input:checked ~ .control__indicator {
   background: #2aa1c0;
 }
-.control:hover input:not([disabled]):checked ~ .control__indicator,
-.control input:checked:focus ~ .control__indicator {
-  background: #0e647d;
-}
 .control input:disabled ~ .control__indicator {
   background: #e6e6e6;
   opacity: 0.6;
@@ -85,6 +81,12 @@ h1 {
 }
 .control--checkbox input:disabled ~ .control__indicator:after {
   border-color: #7b7b7b;
+}
+
+#clock {
+    text-align: center;
+    margin-top: 40px;
+    font-size: 3em;
 }
 
 #alarm {

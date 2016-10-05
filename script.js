@@ -20,9 +20,6 @@ $(document).ready(function() {
         var alarmSound;
         var audioContext = new AudioContext();
         self.startTimer = function(ringTime, alarmTime, cb) {
-            console.log('starting');
-            console.log(ringTime);
-            console.log(alarmTime);
             var hour = parseInt(ringTime.format('H'));
             var minute = parseInt(ringTime.format('mm'));
 
@@ -93,12 +90,13 @@ $(document).ready(function() {
 
     function RemindVM(delay, times, alarmControl) {
         var self = this;
+        self.clock = ko.observable(moment().format('h:mm a'));
         self.alarm = ko.observable(false);
 
         self.interval = ko.observable(30);
         self.delay = ko.observable(delay);
         self.times = ko.observable(times);
-        self.times.initialize = updateTimes;
+        self.times.initialize = createTimes;
         self.times().start.subscribe(updateTimes);
         self.times().end.subscribe(updateTimes);
         self.alarmText = ko.observable();
@@ -108,12 +106,16 @@ $(document).ready(function() {
             this.checked = checked;
         }
 
+        setInterval(function() {
+            self.clock(moment().format('h:mm a'));
+        }, 1000);
+
         self.times.initialize();
 
         self.changeTimer = function(data) {
             if (data.checked) {
                 var ringTime = moment(data.time, 'hh:mm a').subtract(self.delay(), 'minutes');
-                ringTime = moment(); //TODO: take this out
+                // ringTime = moment(); //TODO: take this out
 
                 alarmControl.startTimer(ringTime, data.time, function() {
                     console.log('starting alarm callback');
@@ -131,9 +133,14 @@ $(document).ready(function() {
             alarmControl.stopAlarm();
             self.alarmText('');
             self.alarm(false);
+            updateTimes();
         }
 
         function updateTimes() {
+
+        }
+
+        function createTimes() {
             var curr = moment();
             var start = self.times().start();
             var end = self.times().end();
