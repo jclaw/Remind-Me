@@ -2,16 +2,132 @@ $(document).ready(function() {
     init();
 
     function init() {
-        var delay = localStorage.getItem('delay') || 30;
-        var times = {
-            start: ko.observable(moment("8:00am", "hh:mm a")),
-            end: ko.observable(moment("10:01pm", "hh:mm a")),
-            list: ko.observable(localStorage.getItem('timesList'))
-        }
-        var alarmInterval = 30;
-        var viewModel = new RemindVM(delay, times, new AlarmControl(alarmInterval));
+        var ls = new LS();
+        var data = ls.get();
+
+        console.log(data);
+
+        var interval  = data && data.interval  ? data.interval  : 30;
+        var delay     = data && data.delay     ? data.delay     : 30;
+        var timesList = data && data.timesList ? data.timesList : null;
+        var lastUsed  = data && data.lastUsed  ? data.lastUsed  : null;
+
+        var viewModel = new RemindVM(interval, delay, timesList, lastUsed, new AlarmControl(interval), ls);
         ko.applyBindings(viewModel, $('#remind-me')[0]);
     }
+
+    function RemindVM(interval, delay, timesList, lastUsed, alarmControl, ls) {
+        var self = this;
+
+        self.interval = ko.observable(interval);
+        self.delay = ko.observable(delay);
+        self.timesStart = ko.observable(moment("8:00am", "h:mma"));
+        self.timesEnd = ko.observable(moment("10:01pm", "h:mma"));
+
+        // if used more than 12 hours ago, reset timesList
+        if (!lastUsed || (lastUsed && moment().diff(lastUsed, 'hours') >= 11)) {
+            timesList = createTimes();
+        }
+
+        var times = {
+            start: self.timesStart,
+            end: self.timesEnd,
+            list: ko.observable(timesList)
+        }
+
+        self.times = ko.observable(times);
+        saveToLocalStorage();
+
+        self.timesStart.subscribe(updateTimes);
+        self.timesEnd.subscribe(updateTimes);
+        self.alarmText = ko.observable();
+
+        self.clock = ko.observable(moment().format('h:mma'));
+        self.alarm = ko.observable(false);
+
+        function Time(time, checked) {
+            this.time = time;
+            this.checked = checked;
+        }
+
+        setInterval(function() {
+            self.clock(moment().format('h:mma'));
+        }, 1000);
+
+        self.changeTimer = function(data) {
+            var timesList = self.times().list();
+            ls.updateKey('timesList', timesList);
+
+            if (data.checked) {
+                var ringTime = moment(data.time, 'h:mma').subtract(self.delay(), 'minutes');
+                // ringTime = moment(); //TODO: take this out
+
+                alarmControl.startTimer(ringTime, data.time, function() {
+                    console.log('starting alarm callback');
+
+                    self.alarmText(moment(data.time, 'h:mma').format('h:mm a'));
+                    self.alarm(true);
+                });
+            } else {
+                alarmControl.stopTimer(data.time);
+            }
+        }
+
+        self.stopAlarm = function() {
+            console.log('stopping alarm');
+            alarmControl.stopAlarm();
+            self.alarmText('');
+            self.alarm(false);
+            updateTimes();
+        }
+
+        function updateTimes() {
+
+        }
+
+        function createTimes() {
+            var curr = moment();
+            curr = moment().hours(1); // TODO: take this out
+            var start = self.timesStart();
+            var end = self.timesEnd();
+            if (curr.isBefore(start)) {
+                curr = start;
+            } else {
+                curr = calcStart();
+            }
+
+            console.log(curr._d);
+
+            var times = [];
+
+            while (!curr.isAfter(end)) {
+                times.push(new Time(curr.format("h:mma"), false));
+                curr.add(self.interval(), 'minutes');
+            }
+            return times;
+        }
+
+        function calcStart() {
+            var now = moment();
+            now.seconds(60);
+            var minutes = now.minutes();
+            var newMinutes = (Math.ceil((now.minutes() + 1) / self.interval()) + 1) * self.interval();
+            newMinutes += newMinutes - minutes < self.delay() ? self.interval() : 0;
+            now.minutes(newMinutes);
+            return now;
+        }
+
+        function saveToLocalStorage() {
+            console.log(self.times().list());
+            ls.set({
+                interval  : self.interval(),
+                delay     : self.delay(),
+                timesList : self.times().list(),
+                lastUsed  : moment()
+            })
+        }
+    }
+
 
     function AlarmControl(interval) {
         var self = this;
@@ -88,89 +204,25 @@ $(document).ready(function() {
         }
     }
 
-    function RemindVM(delay, times, alarmControl) {
-        var self = this;
-        self.clock = ko.observable(moment().format('h:mm a'));
-        self.alarm = ko.observable(false);
-
-        self.interval = ko.observable(30);
-        self.delay = ko.observable(delay);
-        self.times = ko.observable(times);
-        self.times.initialize = createTimes;
-        self.times().start.subscribe(updateTimes);
-        self.times().end.subscribe(updateTimes);
-        self.alarmText = ko.observable();
-
-        var Time = function(time, checked) {
-            this.time = time;
-            this.checked = checked;
+    function LS() {
+        // data = {
+        //     interval  : number
+        //     delay     : number
+        //     timesList : array of Time
+        //     lastUsed  : moment object
+        // }
+        var lsKey = 'remindMe';
+        this.get = function() {
+            return JSON.parse(localStorage.getItem(lsKey));
         }
-
-        setInterval(function() {
-            self.clock(moment().format('h:mm a'));
-        }, 1000);
-
-        self.times.initialize();
-
-        self.changeTimer = function(data) {
-            if (data.checked) {
-                var ringTime = moment(data.time, 'hh:mm a').subtract(self.delay(), 'minutes');
-                // ringTime = moment(); //TODO: take this out
-
-                alarmControl.startTimer(ringTime, data.time, function() {
-                    console.log('starting alarm callback');
-
-                    self.alarmText(moment(data.time, 'hh:mm a').format('h:mm a'));
-                    self.alarm(true);
-                });
-            } else {
-                alarmControl.stopTimer(data.time);
-            }
+        this.set = function(data) {
+            localStorage.setItem(lsKey, JSON.stringify(data));
         }
-
-        self.stopAlarm = function() {
-            console.log('stopping alarm');
-            alarmControl.stopAlarm();
-            self.alarmText('');
-            self.alarm(false);
-            updateTimes();
+        this.updateKey = function(key, value) {
+            var data = this.get();
+            if (data) data[key] = value;
+            this.set(data);
         }
-
-        function updateTimes() {
-
-        }
-
-        function createTimes() {
-            var curr = moment();
-            var start = self.times().start();
-            var end = self.times().end();
-            if (curr.isBefore(start)) {
-                curr = start;
-            } else {
-                curr = calcStart();
-            }
-
-            var times = [];
-
-            while (!curr.isAfter(end)) {
-                times.push(new Time(curr.format("hh:mm a"), false));
-                curr.add(self.interval(), 'minutes');
-            }
-
-            self.times().list(times);
-            console.log(self.times().list());
-        }
-
-        function calcStart() {
-            var now = moment();
-            now.seconds(60);
-            var minutes = now.minutes();
-            var newMinutes = (Math.ceil((now.minutes() + 1) / self.interval()) + 1) * self.interval();
-            newMinutes += newMinutes - minutes < self.delay() ? self.interval() : 0;
-            now.minutes(newMinutes);
-            return now;
-        }
-
     }
 
 
