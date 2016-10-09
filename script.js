@@ -138,15 +138,28 @@ $(document).ready(function() {
                 }).slice(); // make a copy of the list
             }
 
+
+
             this.insert = function(alarm) {
-                var index = 1 + binaryIndexOf(0, list.length - 1, alarm.ringTime, getRingTime);
+                var index = binaryIndexOf(0, list.length, alarm.ringTime, getRingTime);
                 return list.splice(index, 0, alarm);
             }
 
             this.remove = function(alarmTime) {
-
-                var index = binaryIndexOf(0, list.length - 1, alarmTime, getAlarmTime);
+                console.log(list);
+                var index = binaryIndexOf(0, list.length, alarmTime, getAlarmTime);
+                console.log(index);
                 return removeIndexAndDuplicates(index, alarmTime, getAlarmTime);
+            }
+
+            // TODO: take this out
+            this.ringTimeIndex = function(ringTime) {
+                return binaryIndexOf(0, list.length, ringTime, getRingTime);
+            }
+
+            // TODO: take this out
+            this.log = function() {
+                console.log(list);
             }
 
             this.pop = function() {
@@ -161,8 +174,11 @@ $(document).ready(function() {
             function getRingTime(alarm) {return alarm.ringTime};
 
             function binaryIndexOf(start, end, value, accessProperty) {
+                console.log('binaryIndexOf');
                 if (start >= end) return start;
                 var index = Math.floor((start + end) / 2);
+                console.log(start, end, index);
+                console.log(accessProperty(list[index]), value);
                 if (accessProperty(list[index]) < value) {
                     return binaryIndexOf(index + 1, end, value, accessProperty);
                 } else {
@@ -170,18 +186,27 @@ $(document).ready(function() {
                 }
             }
 
-            function removeIndexAndDuplicates(index, value, accessProperty) {
+            function removeIndexAndDuplicates(start, value, accessProperty) {
                 var numToDelete = 1;
+                var index = start + 1;
                 while (index < list.length) {
+                    console.log(index, numToDelete);
+
                     if (accessProperty(list[index]) == value) {
                         numToDelete++;
                     } else {
                         break;
                     }
+                    index++;
                 }
-                return list.splice(index, numToDelete);
+                return list.splice(start, numToDelete);
             }
         }
+
+        var list = new AlarmList(); // TODO: take this out
+        list.insert({alarmTime: 1, ringTime: 1})
+        list.insert({alarmTime: 4, ringTime: 4})
+        list.ringTimeIndex(4);
 
         self.alarms = new AlarmList();
         var alarmInterval = interval;
