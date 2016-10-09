@@ -7,19 +7,19 @@ $(document).ready(function() {
 
         console.log(data);
 
-        var interval  = data && data.interval  ? data.interval  : 30;
-        var delay     = data && data.delay     ? data.delay     : 30;
-        var timesList = data && data.timesList ? data.timesList : null;
-        var lastUsed  = data && data.lastUsed  ? data.lastUsed  : null;
+        var timeBetween = data && data.timeBetween ? data.timeBetween : 30;
+        var delay       = data && data.delay       ? data.delay       : 30;
+        var timesList   = data && data.timesList   ? data.timesList   : null;
+        var lastUsed    = data && data.lastUsed    ? data.lastUsed    : null;
 
-        var viewModel = new RemindVM(interval, delay, timesList, lastUsed, new AlarmControl(interval), ls);
+        var viewModel = new RemindVM(timeBetween, delay, timesList, lastUsed, ls);
         ko.applyBindings(viewModel, $('#remind-me')[0]);
     }
 
-    function RemindVM(interval, delay, timesList, lastUsed, alarmControl, ls) {
+    function RemindVM(timeBetween, delay, timesList, lastUsed, ls) {
         var self = this;
 
-        self.interval = ko.observable(interval);
+        self.timeBetween = ko.observable(timeBetween);
         self.delay = ko.observable(delay);
         self.timesStart = ko.observable(moment("8:00am", "h:mma"));
         self.timesEnd = ko.observable(moment("10:01pm", "h:mma"));
@@ -32,18 +32,30 @@ $(document).ready(function() {
         var times = {
             start: self.timesStart,
             end: self.timesEnd,
-            list: ko.observable(timesList)
+            list: ko.observableArray(timesList)
         }
 
         self.times = ko.observable(times);
+
         saveToLocalStorage();
 
-        self.timesStart.subscribe(updateTimes);
-        self.timesEnd.subscribe(updateTimes);
         self.alarmText = ko.observable();
 
         self.clock = ko.observable(moment().format('h:mma'));
         self.alarm = ko.observable(false);
+
+        var alarmControl = new AlarmControl(timeBetween, function(time) {
+            console.log('starting alarm callback');
+
+            self.alarmText(moment(time, 'h:mma').format('h:mm a'));
+            self.alarm(true);
+            console.log(self.times().list());
+            self.times().list.shift();
+            ls.updateKey('timesList', timesList);
+
+
+            alarmControl.removeCurrentAlarm();
+        });
 
         function Time(time, checked) {
             this.time = time;
@@ -59,12 +71,7 @@ $(document).ready(function() {
             ls.updateKey('timesList', timesList);
 
             if (data.checked) {
-                alarmControl.createAlarm(data.time, function() {
-                    console.log('starting alarm callback');
-
-                    self.alarmText(moment(data.time, 'h:mma').format('h:mm a'));
-                    self.alarm(true);
-                });
+                alarmControl.createAlarm(data.time);
             } else {
                 alarmControl.deleteAlarm(data.time);
             }
@@ -75,11 +82,6 @@ $(document).ready(function() {
             alarmControl.stopAlarm();
             self.alarmText('');
             self.alarm(false);
-            updateTimes();
-        }
-
-        function updateTimes() {
-
         }
 
         function createTimes() {
@@ -99,7 +101,7 @@ $(document).ready(function() {
 
             while (!curr.isAfter(end)) {
                 times.push(new Time(curr.format("h:mma"), false));
-                curr.add(self.interval(), 'minutes');
+                curr.add(self.timeBetween(), 'minutes');
             }
             return times;
         }
@@ -108,8 +110,8 @@ $(document).ready(function() {
             var now = moment();
             now.seconds(60);
             var minutes = now.minutes();
-            var newMinutes = (Math.ceil((now.minutes() + 1) / self.interval()) + 1) * self.interval();
-            newMinutes += newMinutes - minutes < self.delay() ? self.interval() : 0;
+            var newMinutes = (Math.ceil((now.minutes() + 1) / self.timeBetween()) + 1) * self.timeBetween();
+            newMinutes += newMinutes - minutes < self.delay() ? self.timeBetween() : 0;
             now.minutes(newMinutes);
             return now;
         }
@@ -117,191 +119,12 @@ $(document).ready(function() {
         function saveToLocalStorage() {
             console.log(self.times().list());
             ls.set({
-                interval  : self.interval(),
-                delay     : self.delay(),
-                timesList : self.times().list(),
-                lastUsed  : moment()
+                timeBetween  : self.timeBetween(),
+                delay        : self.delay(),
+                timesList    : self.times().list(),
+                lastUsed     : moment()
             })
         }
     }
-
-
-    function AlarmControl(interval) {
-        var self = this;
-
-        function AlarmList(unsortedList) {
-            var self = this;
-            var list = [];
-            if (unsortedList) {
-                list = unsortedList.sort(function(a,b) {
-                    return a.ringTime > b.ringTime ? -1 : 1;
-                }).slice(); // make a copy of the list
-            }
-
-            this.insert = function(alarm) {
-                var index = binaryIndexOfReverse(0, list.length - 1, alarm.ringTime, getRingTime, function(index) {
-                    return index;
-                });
-                list.splice(index, 0, alarm);
-            }
-
-            this.remove = function(alarmTime) {
-                console.log(list);
-                var index = binaryIndexOfReverse(0, list.length - 1, alarmTime, getAlarmTime, function() {
-                    return -1;
-                });
-                return index == -1 ? index : removeIndexAndDuplicates(index, alarmTime, getAlarmTime);
-            }
-
-            // TODO: take this out
-            this.ringTimeIndex = function(ringTime) {
-                return binaryIndexOfReverse(0, list.length - 1, ringTime, getRingTime, function(index) {
-                    return index;
-                });
-            }
-
-            // TODO: take this out
-            this.log = function() {
-                console.log(list);
-            }
-
-            this.pop = function() {
-                return list.pop();
-            }
-
-            this.length = function() {
-                return list.length;
-            }
-
-            function getAlarmTime(alarm) {return alarm.alarmTime};
-            function getRingTime(alarm) {return alarm.ringTime};
-
-            function binaryIndexOfReverse(start, end, value, accessProperty, notFound) {
-                if (start > end) return notFound(start);
-                var index = (start + end) / 2 | 0;
-                if (accessProperty(list[index]) > value) {
-                    return binaryIndexOfReverse(index + 1, end, value, accessProperty, notFound);
-                } else if (accessProperty(list[index]) < value) {
-                    return binaryIndexOfReverse(start, index - 1, value, accessProperty, notFound);
-                } else {
-                    return index;
-                }
-            }
-
-            function removeIndexAndDuplicates(start, value, accessProperty) {
-                while (start > 0 && accessProperty(list[start - 1]) == value) {
-                    start--;
-                }
-
-                var index = start + 1;
-                while (index < list.length && accessProperty(list[index]) == value) {
-                    index++;
-                }
-
-                return list.splice(start, index - start);
-            }
-        }
-
-        var list = new AlarmList();
-        list.insert({alarmTime: 1, ringTime: 1});
-
-        self.alarms = new AlarmList();
-        var alarmInterval = interval;
-        var alarmSound;
-        var audioContext = new AudioContext();
-
-        self.createAlarm = function(alarmTime, cb) {
-            var ringTime = moment(data.time, 'h:mma').subtract(self.delay(), 'minutes');
-            // ringTime = moment(); //TODO: take this out
-
-            self.alarms.insert({alarmTime: alarmTime, ringTime: ringTime});
-
-            var hour = parseInt(ringTime.format('H'));
-            var minute = parseInt(ringTime.format('mm'));
-
-            function alarmTimer() {
-                var now = moment();
-                var currentHour = parseInt(now.format('H'));
-                var currentMinute = parseInt(now.format('mm'));
-                console.log(currentHour, currentMinute);
-                if ((hour === currentHour) && (minute === currentMinute)) {
-                    startAlarm(alarmTime);
-                    cb();
-                }
-            }
-            self.timers[alarmTime] = setInterval(alarmTimer, 1000);
-            console.log(self.timers);
-        }
-
-        self.deleteAlarm = function(time) {
-            self.alarms.remove(time);
-        }
-
-        self.setAlarmInterval = function(interval) {
-            alarmInterval = interval;
-            // TODO: update timers
-        }
-
-        self.stopAlarm = function() {
-            clearInterval(alarmInterval);
-        }
-
-        function startAlarm(time) {
-            console.log(time);
-            console.log(self.timers);
-            clearInterval(self.timers[time]);
-            delete self.timers[time];
-            alarmInterval = setInterval(playAlarmNote, 500);
-            var timeElement = $('#times input:checkbox').filter(function() {
-                return this.value === time;
-            });
-        }
-
-        function playAlarmNote() {
-            alarmSound = audioContext.createOscillator();
-            var volume = audioContext.createGain();
-
-            volume.gain.value = 0.1;
-            alarmSound.connect(volume);
-            volume.connect(audioContext.destination);
-
-            // How long to play oscillator for (in seconds)
-            var duration = .1;
-
-            // When to start playing the oscillators
-            var startTime = audioContext.currentTime;
-
-            var frequency = 493.883;
-            alarmSound.frequency.value = frequency;
-
-            volume.gain.setValueAtTime(0.1, startTime + duration - 0.01);
-            volume.gain.linearRampToValueAtTime(0, startTime + duration);
-
-            alarmSound.start(startTime);
-            alarmSound.stop(startTime + duration);
-        }
-    }
-
-    function LS() {
-        // data = {
-        //     interval  : number
-        //     delay     : number
-        //     timesList : array of Time
-        //     lastUsed  : moment object
-        // }
-        var lsKey = 'remindMe';
-        this.get = function() {
-            return JSON.parse(localStorage.getItem(lsKey));
-        }
-        this.set = function(data) {
-            localStorage.setItem(lsKey, JSON.stringify(data));
-        }
-        this.updateKey = function(key, value) {
-            var data = this.get();
-            if (data) data[key] = value;
-            this.set(data);
-        }
-    }
-
 
 });
