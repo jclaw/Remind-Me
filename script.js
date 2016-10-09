@@ -54,22 +54,19 @@ $(document).ready(function() {
             self.clock(moment().format('h:mma'));
         }, 1000);
 
-        self.changeTimer = function(data) {
+        self.changeAlarm = function(data) {
             var timesList = self.times().list();
             ls.updateKey('timesList', timesList);
 
             if (data.checked) {
-                var ringTime = moment(data.time, 'h:mma').subtract(self.delay(), 'minutes');
-                // ringTime = moment(); //TODO: take this out
-
-                alarmControl.startTimer(ringTime, data.time, function() {
+                alarmControl.createAlarm(data.time, function() {
                     console.log('starting alarm callback');
 
                     self.alarmText(moment(data.time, 'h:mma').format('h:mm a'));
                     self.alarm(true);
                 });
             } else {
-                alarmControl.stopTimer(data.time);
+                alarmControl.deleteAlarm(data.time);
             }
         }
 
@@ -131,11 +128,72 @@ $(document).ready(function() {
 
     function AlarmControl(interval) {
         var self = this;
-        self.timers = {};
+
+        function AlarmList(unsortedList) {
+            var self = this;
+            var list = [];
+            if (unsortedList) {
+                list = unsortedList.sort(function(a,b) {
+                    return a.ringTime < b.ringTime ? -1 : 1;
+                }).slice(); // make a copy of the list
+            }
+
+            this.insert = function(alarm) {
+                var index = 1 + binaryIndexOf(0, list.length - 1, alarm.ringTime, getRingTime);
+                return list.splice(index, 0, alarm);
+            }
+
+            this.remove = function(alarmTime) {
+
+                var index = binaryIndexOf(0, list.length - 1, alarmTime, getAlarmTime);
+                return removeIndexAndDuplicates(index, alarmTime, getAlarmTime);
+            }
+
+            this.pop = function() {
+                return list.pop();
+            }
+
+            this.length = function() {
+                return list.length;
+            }
+
+            function getAlarmTime(alarm) {return alarm.alarmTime};
+            function getRingTime(alarm) {return alarm.ringTime};
+
+            function binaryIndexOf(start, end, value, accessProperty) {
+                if (start >= end) return start;
+                var index = Math.floor((start + end) / 2);
+                if (accessProperty(list[index]) < value) {
+                    return binaryIndexOf(index + 1, end, value, accessProperty);
+                } else {
+                    return binaryIndexOf(start, index - 1, value, accessProperty);
+                }
+            }
+
+            function removeIndexAndDuplicates(index, value, accessProperty) {
+                var numToDelete = 1;
+                while (index < list.length) {
+                    if (accessProperty(list[index]) == value) {
+                        numToDelete++;
+                    } else {
+                        break;
+                    }
+                }
+                return list.splice(index, numToDelete);
+            }
+        }
+
+        self.alarms = new AlarmList();
         var alarmInterval = interval;
         var alarmSound;
         var audioContext = new AudioContext();
-        self.startTimer = function(ringTime, alarmTime, cb) {
+
+        self.createAlarm = function(alarmTime, cb) {
+            var ringTime = moment(data.time, 'h:mma').subtract(self.delay(), 'minutes');
+            // ringTime = moment(); //TODO: take this out
+
+            self.alarms.insert({alarmTime: alarmTime, ringTime: ringTime});
+
             var hour = parseInt(ringTime.format('H'));
             var minute = parseInt(ringTime.format('mm'));
 
@@ -153,10 +211,8 @@ $(document).ready(function() {
             console.log(self.timers);
         }
 
-        self.stopTimer = function(time) {
-            console.log('stopping');
-            clearInterval(self.timers[time]);
-            delete self.timers[time];
+        self.deleteAlarm = function(time) {
+            self.alarms.remove(time);
         }
 
         self.setAlarmInterval = function(interval) {
