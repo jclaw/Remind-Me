@@ -134,27 +134,35 @@ $(document).ready(function() {
             var list = [];
             if (unsortedList) {
                 list = unsortedList.sort(function(a,b) {
-                    return a.ringTime < b.ringTime ? -1 : 1;
+                    return a.ringTime > b.ringTime ? -1 : 1;
                 }).slice(); // make a copy of the list
             }
 
-
-
             this.insert = function(alarm) {
-                var index = binaryIndexOf(0, list.length - 1, alarm.ringTime, getRingTime);
-                return list.splice(index, 0, alarm);
+                var index = binaryIndexOfReverse(0, list.length - 1, alarm.ringTime, getRingTime, function(index) {
+                    return index;
+                });
+                list.splice(index, 0, alarm);
             }
 
             this.remove = function(alarmTime) {
                 console.log(list);
-                var index = binaryIndexOf(0, list.length - 1, alarmTime, getAlarmTime);
-                console.log(index);
-                return removeIndexAndDuplicates(index, alarmTime, getAlarmTime);
+                var index = binaryIndexOfReverse(0, list.length - 1, alarmTime, getAlarmTime, function() {
+                    return -1;
+                });
+                // TODO: clean this up?
+                if (index == -1) {
+                    return index;
+                } else {
+                    return removeIndexAndDuplicates(index, alarmTime, getAlarmTime);
+                }
             }
 
             // TODO: take this out
             this.ringTimeIndex = function(ringTime) {
-                return binaryIndexOf(0, list.length - 1, ringTime, getRingTime);
+                return binaryIndexOfReverse(0, list.length - 1, ringTime, getRingTime, function(index) {
+                    return index;
+                });
             }
 
             // TODO: take this out
@@ -173,42 +181,22 @@ $(document).ready(function() {
             function getAlarmTime(alarm) {return alarm.alarmTime};
             function getRingTime(alarm) {return alarm.ringTime};
 
-            function binaryIndexOf(start, end, value, accessProperty) {
-                console.log('binaryIndexOf');
-                if (start > end) return start;
+            function binaryIndexOfReverse(start, end, value, accessProperty, notFound) {
+                if (start > end) return notFound(start);
                 var index = (start + end) / 2 | 0;
-                console.log(start, end, index);
-                console.log(accessProperty(list[index]), value);
-                if (accessProperty(list[index]) < value) {
-                    return binaryIndexOf(index + 1, end, value, accessProperty);
-                } else if (accessProperty(list[index]) > value) {
-                    return binaryIndexOf(start, index - 1, value, accessProperty);
+                if (accessProperty(list[index]) > value) {
+                    return binaryIndexOfReverse(index + 1, end, value, accessProperty, notFound);
+                } else if (accessProperty(list[index]) < value) {
+                    return binaryIndexOfReverse(start, index - 1, value, accessProperty, notFound);
                 } else {
                     return index;
                 }
             }
 
-            // function binaryIndexOf(start, end, value) {
-            //     console.log('binaryIndexOf');
-            //     if (start > end) return start;
-            //     var index = (start + end) / 2 | 0;
-            //     console.log(start, end, index);
-            //     console.log(list[index].ringTime, value);
-            //     if (list[index].ringTime < value) {
-            //         return binaryIndexOf(index + 1, end, value);
-            //     } else if (accessProperty(list[index]) > value) {
-            //         return binaryIndexOf(start, index - 1, value);
-            //     } else {
-            //         return index;
-            //     }
-            // }
-
             function removeIndexAndDuplicates(start, value, accessProperty) {
                 var numToDelete = 1;
                 var index = start + 1;
                 while (index < list.length) {
-                    console.log(index, numToDelete);
-
                     if (accessProperty(list[index]) == value) {
                         numToDelete++;
                     } else {
@@ -220,10 +208,8 @@ $(document).ready(function() {
             }
         }
 
-        var list = new AlarmList(); // TODO: take this out
-        list.insert({alarmTime: 1, ringTime: 1})
-        list.insert({alarmTime: 4, ringTime: 4})
-        list.ringTimeIndex(4);
+        var list = new AlarmList();
+        list.insert({alarmTime: 1, ringTime: 1});
 
         self.alarms = new AlarmList();
         var alarmInterval = interval;
