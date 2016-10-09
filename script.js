@@ -141,20 +141,20 @@ $(document).ready(function() {
 
 
             this.insert = function(alarm) {
-                var index = binaryIndexOf(0, list.length, alarm.ringTime, getRingTime);
+                var index = binaryIndexOf(0, list.length - 1, alarm.ringTime, getRingTime);
                 return list.splice(index, 0, alarm);
             }
 
             this.remove = function(alarmTime) {
                 console.log(list);
-                var index = binaryIndexOf(0, list.length, alarmTime, getAlarmTime);
+                var index = binaryIndexOf(0, list.length - 1, alarmTime, getAlarmTime);
                 console.log(index);
                 return removeIndexAndDuplicates(index, alarmTime, getAlarmTime);
             }
 
             // TODO: take this out
             this.ringTimeIndex = function(ringTime) {
-                return binaryIndexOf(0, list.length, ringTime, getRingTime);
+                return binaryIndexOf(0, list.length - 1, ringTime, getRingTime);
             }
 
             // TODO: take this out
@@ -175,16 +175,33 @@ $(document).ready(function() {
 
             function binaryIndexOf(start, end, value, accessProperty) {
                 console.log('binaryIndexOf');
-                if (start >= end) return start;
-                var index = Math.floor((start + end) / 2);
+                if (start > end) return start;
+                var index = (start + end) / 2 | 0;
                 console.log(start, end, index);
                 console.log(accessProperty(list[index]), value);
                 if (accessProperty(list[index]) < value) {
                     return binaryIndexOf(index + 1, end, value, accessProperty);
-                } else {
+                } else if (accessProperty(list[index]) > value) {
                     return binaryIndexOf(start, index - 1, value, accessProperty);
+                } else {
+                    return index;
                 }
             }
+
+            // function binaryIndexOf(start, end, value) {
+            //     console.log('binaryIndexOf');
+            //     if (start > end) return start;
+            //     var index = (start + end) / 2 | 0;
+            //     console.log(start, end, index);
+            //     console.log(list[index].ringTime, value);
+            //     if (list[index].ringTime < value) {
+            //         return binaryIndexOf(index + 1, end, value);
+            //     } else if (accessProperty(list[index]) > value) {
+            //         return binaryIndexOf(start, index - 1, value);
+            //     } else {
+            //         return index;
+            //     }
+            // }
 
             function removeIndexAndDuplicates(start, value, accessProperty) {
                 var numToDelete = 1;
