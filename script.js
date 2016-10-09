@@ -150,12 +150,7 @@ $(document).ready(function() {
                 var index = binaryIndexOfReverse(0, list.length - 1, alarmTime, getAlarmTime, function() {
                     return -1;
                 });
-                // TODO: clean this up?
-                if (index == -1) {
-                    return index;
-                } else {
-                    return removeIndexAndDuplicates(index, alarmTime, getAlarmTime);
-                }
+                return index == -1 ? index : removeIndexAndDuplicates(index, alarmTime, getAlarmTime);
             }
 
             // TODO: take this out
@@ -194,17 +189,16 @@ $(document).ready(function() {
             }
 
             function removeIndexAndDuplicates(start, value, accessProperty) {
-                var numToDelete = 1;
+                while (start > 0 && accessProperty(list[start - 1]) == value) {
+                    start--;
+                }
+
                 var index = start + 1;
-                while (index < list.length) {
-                    if (accessProperty(list[index]) == value) {
-                        numToDelete++;
-                    } else {
-                        break;
-                    }
+                while (index < list.length && accessProperty(list[index]) == value) {
                     index++;
                 }
-                return list.splice(start, numToDelete);
+
+                return list.splice(start, index - start);
             }
         }
 
