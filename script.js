@@ -7,8 +7,10 @@ $(document).ready(function() {
 
         console.log(data);
 
-        var timeBetween = data && data.timeBetween ? data.timeBetween : 30;
-        var delay       = data && data.delay       ? data.delay       : 30;
+        // var timeBetween = data && data.timeBetween ? data.timeBetween : 30;
+        var timeBetween = 2;
+        var delay = 15;
+        // var delay       = data && data.delay       ? data.delay       : 30;
         var timesList   = data && data.timesList   ? data.timesList   : null;
         var lastUsed    = data && data.lastUsed    ? data.lastUsed    : null;
 
@@ -29,6 +31,9 @@ $(document).ready(function() {
             timesList = createTimes();
         }
 
+        // TODO: take this out
+        timesList = createTimes();
+
         var times = {
             start: self.timesStart,
             end: self.timesEnd,
@@ -44,7 +49,7 @@ $(document).ready(function() {
         self.clock = ko.observable(moment().format('h:mma'));
         self.alarm = ko.observable(false);
 
-        var alarmControl = new AlarmControl(timeBetween, function(time) {
+        var alarmControl = new AlarmControl(delay, function(time) {
             console.log('starting alarm callback');
 
             self.alarmText(moment(time, 'h:mma').format('h:mm a'));
@@ -84,6 +89,9 @@ $(document).ready(function() {
             self.alarm(false);
         }
 
+        // TODO: take this out
+        self.createTimes = createTimes;
+
         function createTimes() {
             var curr = moment();
             // curr = moment().hours(1); // TODO: take this out
@@ -98,6 +106,7 @@ $(document).ready(function() {
             console.log(curr._d);
 
             var times = [];
+            console.log('time between:', self.timeBetween());
 
             while (!curr.isAfter(end)) {
                 times.push(new Time(curr.format("h:mma"), false));
@@ -108,11 +117,25 @@ $(document).ready(function() {
 
         function calcStart() {
             var now = moment();
-            now.seconds(60);
+            console.log('calcstart');
+            now.seconds(60); // rounds seconds up to nearest minute
             var minutes = now.minutes();
-            var newMinutes = (Math.ceil((now.minutes() + 1) / self.timeBetween()) + 1) * self.timeBetween();
-            newMinutes += newMinutes - minutes < self.delay() ? self.timeBetween() : 0;
-            now.minutes(newMinutes);
+            console.log(minutes);
+
+            // the first alarm has to be offset from the current time by
+            // at least the amount of the delay
+            var soonestTime = minutes + self.delay();
+            console.log('soonest time: ', soonestTime);
+            var distanceToNextInterval;
+            if (soonestTime % self.timeBetween() == 0) {
+                distanceToNextInterval = 0;
+            } else {
+                distanceToNextInterval = self.timeBetween() - (soonestTime % self.timeBetween());
+            }
+            console.log('distance to next interval: ', distanceToNextInterval);
+            var nextInterval = soonestTime + distanceToNextInterval;
+
+            now.minutes(nextInterval);
             return now;
         }
 

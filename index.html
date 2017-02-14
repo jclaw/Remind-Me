@@ -20,9 +20,9 @@
         <div class="control-group" data-bind="visible: !alarm()">
             <h1>Remind me</h1>
             <h3>
-                <select id="delay-time">
+                <select id="delay-time" data-bind="value: delay">
                     <option value="15">15</option>
-                    <option value="30" selected="selected">30</option>
+                    <option value="30">30</option>
                 </select>
                 minutes before
             </h3>

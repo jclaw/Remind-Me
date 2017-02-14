@@ -1,4 +1,4 @@
-function AlarmControl(timeBetween, alarmCallback) {
+function AlarmControl(delay, alarmCallback) {
     var self = this;
 
     function AlarmList(unsortedList) {
@@ -18,7 +18,6 @@ function AlarmControl(timeBetween, alarmCallback) {
         }
 
         this.remove = function(alarmTime) {
-            console.log(list);
             var index = binaryIndexOfReverse(0, list.length - 1, alarmTime, getAlarmTime, function() {
                 return -1;
             });
@@ -87,9 +86,10 @@ function AlarmControl(timeBetween, alarmCallback) {
     startTimer();
 
     self.createAlarm = function(alarmTime) {
-        var ringTime = moment(alarmTime, 'h:mma').subtract(timeBetween, 'minutes');
+        console.log('create alarm');
+        var ringTime = moment(alarmTime, 'h:mma').subtract(delay, 'minutes');
         // ringTime = moment(); //TODO: take this out
-
+        console.log(ringTime.format('h:mma'));
         self.alarms.insert({alarmTime: alarmTime, ringTime: ringTime});
     }
 
@@ -101,8 +101,8 @@ function AlarmControl(timeBetween, alarmCallback) {
         return self.alarms.pop();
     }
 
-    self.setAlarmTimeBetween = function(tb) {
-        timeBetween = tb;
+    self.setAlarmDelay = function(d) {
+        delay = d;
         // TODO: update timers
     }
 
