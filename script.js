@@ -7,10 +7,8 @@ $(document).ready(function() {
 
         console.log(data);
 
-        // var timeBetween = data && data.timeBetween ? data.timeBetween : 30;
-        var timeBetween = 1;
-        var delay = 15;
-        // var delay       = data && data.delay       ? data.delay       : 30;
+        var timeBetween = data && data.timeBetween ? parseInt(data.timeBetween) : 1;
+        var delay       = data && data.delay       ? parseInt(data.delay)       : 15;
         var activeAlarms = data && data.activeAlarms ? data.activeAlarms : [];
         var lastUsed    = data && data.lastUsed    ? data.lastUsed    : null;
 
@@ -39,7 +37,7 @@ $(document).ready(function() {
         self.delay = ko.observable(delay);
         self.timesStart = ko.observable(moment("8:00am", "h:mma"));
         // self.timesEnd = ko.observable(moment("10:01pm", "h:mma"));
-        self.timesEnd = ko.observable(moment("11:31pm", "h:mma"));
+        self.timesEnd = ko.observable(moment("11:59pm", "h:mma"));
 
         self.alarmText = ko.observable();
 
@@ -51,6 +49,13 @@ $(document).ready(function() {
             end: self.timesEnd,
             list: ko.observableArray(createTimes())
         });
+
+        self.delay.subscribe(function(newDelay) {
+            alarmControl.setAlarmDelay(newDelay);
+            ls.updateKey('delay', newDelay);
+        })
+
+        console.log(self.times().list());
 
         saveToLocalStorage();
 
@@ -64,8 +69,6 @@ $(document).ready(function() {
         }, 1000);
 
         self.changeAlarm = function(data, e) {
-            console.log('changed alarm');
-            console.log(e);
             if (data.checked) {
                 alarmControl.createAlarm(data.time);
             } else {
@@ -80,17 +83,25 @@ $(document).ready(function() {
         }
 
         function createTimes() {
-            var curr = moment();
+            var now = moment();
+            var curr;
             // curr = moment().hours(1); // TODO: take this out
             var start = self.timesStart();
             var end = self.timesEnd();
-            if (curr.isBefore(start)) {
+            console.log(now.format('h:mma'));
+            console.log(start.format('h:mma'));
+            if (now.isBefore(start)) {
+                console.log('at start');
                 curr = start;
             } else {
+                console.log('calculating start');
                 curr = calcStart();
             }
 
             var times = [];
+
+            console.log(curr.format('h:mma'));
+            console.log(end.format('h:mma'));
 
             while (!curr.isAfter(end)) {
                 var activeAlarms = alarmControl.activeAlarms();
@@ -112,14 +123,19 @@ $(document).ready(function() {
 
             // the first alarm has to be offset from the current time by
             // at least the amount of the delay
+            console.log(minutes);
+            console.log('delay:', self.delay());
             var soonestTime = minutes + self.delay();
+            console.log(soonestTime);
             var distanceToNextInterval;
             if (soonestTime % self.timeBetween() == 0) {
                 distanceToNextInterval = 0;
             } else {
                 distanceToNextInterval = self.timeBetween() - (soonestTime % self.timeBetween());
             }
+            console.log(distanceToNextInterval);
             var nextInterval = soonestTime + distanceToNextInterval;
+            console.log(nextInterval);
 
             now.minutes(nextInterval);
             return now;
