@@ -1,4 +1,4 @@
-function AlarmControl(delay, alarmCallback) {
+function AlarmControl(delay, prevActiveAlarms, LS, alarmCallback) {
     var self = this;
 
     function AlarmList(unsortedList) {
@@ -32,9 +32,10 @@ function AlarmControl(delay, alarmCallback) {
         }
 
         // TODO: take this out
-        this.log = function() {
-            console.log(list);
+        this.list = function() {
+            return list;
         }
+
 
         this.pop = function() {
             return list.pop();
@@ -77,33 +78,61 @@ function AlarmControl(delay, alarmCallback) {
         }
     }
 
-    self.alarms = new AlarmList();
-    var alarmSound;
-    var timerInterval;
-    var alarmNoteInterval;
-    var audioContext = new AudioContext();
-
-    startTimer();
-
     self.createAlarm = function(alarmTime) {
         console.log('create alarm');
         var ringTime = moment(alarmTime, 'h:mma').subtract(delay, 'minutes');
-        // ringTime = moment(); //TODO: take this out
-        console.log(ringTime.format('h:mma'));
+        console.log(alarmTime, ': ringing at', ringTime.format('h:mma'));
         self.alarms.insert({alarmTime: alarmTime, ringTime: ringTime});
+        LS.updateKey('activeAlarms', self.activeAlarms());
     }
 
     self.deleteAlarm = function(alarmTime) {
-        return self.alarms.remove(alarmTime);
+        var deletedAlarm = self.alarms.remove(alarmTime);
+        LS.updateKey('activeAlarms', self.activeAlarms());
+        return deletedAlarm;
     }
 
     self.removeCurrentAlarm = function() {
         return self.alarms.pop();
     }
 
+    self.activeAlarms = function() {
+        return self.alarms.list();
+    }
+
     self.setAlarmDelay = function(d) {
         delay = d;
         // TODO: update timers
+    }
+
+    init();
+
+
+
+
+    function init() {
+        self.alarms = new AlarmList();
+        var alarmSound;
+        var timerInterval;
+        var alarmNoteInterval;
+        var audioContext = new AudioContext();
+
+        startTimer();
+        addPrevActiveAlarms();
+    }
+
+    function addPrevActiveAlarms() {
+        var now = moment();
+        var alarm;
+        var ringTime;
+        console.log(prevActiveAlarms);
+        for (var i = 0; i < prevActiveAlarms.length; i++) {
+            alarm = prevActiveAlarms[i];
+            ringTime = moment(alarm.ringTime);
+            if (ringTime.isAfter(now)) {
+                self.createAlarm(prevActiveAlarms[i].alarmTime);
+            }
+        }
     }
 
     function startTimer() {
@@ -116,9 +145,7 @@ function AlarmControl(delay, alarmCallback) {
                 var minute = parseInt(alarm.ringTime.format('mm'));
                 var currentHour = parseInt(now.format('H'));
                 var currentMinute = parseInt(now.format('mm'));
-                console.log(currentHour, currentMinute);
                 if ((hour === currentHour) && (minute === currentMinute)) {
-                    console.log(hour, minute, currentHour, currentMinute);
                     startAlarm();
                     alarmCallback(alarm.alarmTime);
                 }
@@ -129,14 +156,20 @@ function AlarmControl(delay, alarmCallback) {
     }
 
     self.stopAlarm = function() {
-        clearInterval(alarmNoteInterval);
-        self.alarms.log();
+        alarmSound.pause();
+        alarmSound.currentTime = 0;
         startTimer();
     }
 
     function startAlarm() {
-        clearInterval(timerInterval);
-        alarmNoteInterval = setInterval(playAlarmNote, 500);
+
+        alarmSound = new Audio('Glass.mp3');
+        alarmSound.addEventListener('ended', function() {
+            this.currentTime = 0;
+            this.play();
+        }, false);
+        alarmSound.play();
+
     }
 
     function playAlarmNote() {
@@ -168,7 +201,7 @@ function LS() {
     // data = {
     //     interval  : number
     //     delay     : number
-    //     timesList : array of Time
+    //     activeAlarms : array of active alarms
     //     lastUsed  : moment object
     // }
     var lsKey = 'remindMe';
@@ -180,7 +213,8 @@ function LS() {
     }
     this.updateKey = function(key, value) {
         var data = this.get();
-        if (data) data[key] = value;
+        if (data && key in data) data[key] = value;
+        else console.error('key not found in local storage');
         this.set(data);
     }
 }

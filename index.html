@@ -36,7 +36,7 @@
             <div id="times" data-bind="foreach: times().list">
                 <label class="control control--checkbox">
                     <span data-bind="text: time"></span>
-                    <input type="checkbox" data-bind="value: time, checked: checked, event: {change: $parent.changeAlarm($data)}">
+                    <input type="checkbox" data-bind="value: time, checked: checked, event: { change: function() { $parent.changeAlarm($data) } }">
                     <div class="control__indicator"></div>
                 </label>
             </div>
