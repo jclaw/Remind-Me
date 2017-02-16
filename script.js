@@ -8,7 +8,7 @@ $(document).ready(function() {
         console.log(data);
 
         var timeBetween = data && data.timeBetween ? parseInt(data.timeBetween) : 30;
-        var delay       = data && data.delay       ? parseInt(data.delay)       : 30;
+        var delay       = data && data.delay       ? parseInt(data.delay)       : 15;
         var activeAlarms = data && data.activeAlarms ? data.activeAlarms : [];
         var lastUsed    = data && data.lastUsed    ? data.lastUsed    : null;
 
