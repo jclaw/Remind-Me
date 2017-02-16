@@ -36,8 +36,7 @@ $(document).ready(function() {
         self.timeBetween = ko.observable(timeBetween);
         self.delay = ko.observable(delay);
         self.timesStart = ko.observable(moment("8:00am", "h:mma"));
-        // self.timesEnd = ko.observable(moment("10:01pm", "h:mma"));
-        self.timesEnd = ko.observable(moment("11:59pm", "h:mma"));
+        self.timesEnd = ko.observable(moment("10:01pm", "h:mma"));
 
         self.alarmText = ko.observable();
 
