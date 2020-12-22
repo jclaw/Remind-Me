@@ -146,7 +146,7 @@ $(document).ready(function() {
                 delay        : self.delay(),
                 activeAlarms : alarmControl.activeAlarms(),
                 lastUsed     : moment()
-            })
+            });
         }
     }
 
